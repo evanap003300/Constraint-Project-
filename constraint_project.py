@@ -1,57 +1,49 @@
 from constraint import Problem, AllDifferentConstraint
 
-def attack_constraint(k1, k2):
-    """Ensures two knights do not attack each other."""
-    x1, y1 = k1
-    x2, y2 = k2
-    
-    dx = abs(x1 - x2)  # Difference in rows
-    dy = abs(y1 - y2)  # Difference in columns
+def knight_attack(pos1, pos2):
+    """
+    Return True if knights at pos1 and pos2 do NOT attack each other.
+    """
+    x1, y1 = pos1
+    x2, y2 = pos2
+    dx = abs(x1 - x2)
+    dy = abs(y1 - y2)
+    return not ((dx == 2 and dy == 1) or (dx == 1 and dy == 2))
 
-    attacking_moves = [(2, 1), (1, 2)]  # Relative knight moves
+def solve_k_knights(n, k):
+    """
+    Try to place k non-attacking knights on an n x n chessboard.
+    Returns a dict of knight positions or None if not possible.
+    """
+    if k > 32:
+        return None  
 
-    if (dx, dy) in attacking_moves:
-        return False  # Knights are attacking each other
-    return True  # Knights are safe
+    board = [(x, y) for x in range(n) for y in range(n)]
 
-def solve_csp(n, k):
+    white_squares = [pos for pos in board if (pos[0] + pos[1]) % 2 == 0]
+    if k <= len(white_squares):
+        return { f"K{i}": white_squares[i] for i in range(k) }
+
     problem = Problem()
-
-    knights = []
-
-    # Populate knights list
-    for i in range(k):
-        knight_name = f"K{i}"
-        knights.append(knight_name)
-
-    # Populate domain list 
-    domain = []
-    for x in range(n):
-        for y in range(n):
-            position = (x, y)
-            domain.append(position)
-
-    for knight in knights:
-        problem.addVariable(knight, domain)
-
-    # Add constraints: No two knights can attack each other
-    for i in range(k):
-        for j in range(i + 1, k):
-            problem.addConstraint(attack_constraint, (knights[i], knights[j]))
-
-    # Add uniqueness constraint: No two knights can occupy the same position
+    knights = [f"K{i}" for i in range(k)]
+    problem.addVariables(knights, board)
     problem.addConstraint(AllDifferentConstraint(), knights)
 
-    # Solve and return results
-    solution = problem.getSolution() 
-    return solution
+    for i in range(k - 1):
+        problem.addConstraint(lambda a, b: a < b, (knights[i], knights[i + 1]))
+
+    for i in range(k):
+        for j in range(i + 1, k):
+            problem.addConstraint(knight_attack, (knights[i], knights[j]))
+
+    return problem.getSolution()
 
 def find_max_knights(n):
     max_knights = 0
     best_solution = None
 
     for k in range(1, 64): # n * n + 1
-        solution = solve_csp(n, k)
+        solution = solve_k_knights(n, k)
         if solution:
             max_knights = k
             best_solution = solution  # save valid solution
@@ -60,26 +52,20 @@ def find_max_knights(n):
 
     return max_knights, best_solution
 
-# 8 rows and 8 cols on a chess board
-n = 8
+n = 8  # board size
+mode = input("Choose mode (solve/max): ").strip().lower()
 
-print("-------- Solving for possible solutions given k knights --------\n")
-k = int(input("How many knights are on the board: "))
-
-if k > n * n: # Check that there are less knights than board positions
-    print("Too many Knights for board! (k <= 64)")
-else:
-    if k > 24:
-        print("This may take awhile you may want to try a smaller number like k < 25")
-    solutions = solve_csp(n, k)
-    if len(solutions) > 0:
-        print("Found a Valid Solution")
+if mode == "solve":
+    k = int(input("Enter number of knights (k): "))
+    solution = solve_k_knights(n, k)
+    if solution:
+        print("\nSolution found:")
+        for knight, pos in sorted(solution.items()):
+            print(f"{knight}: {pos}")
     else:
-        print("No valid solution found")
-    if len(solutions) > 0:
-        print("Solution:", solutions) 
-
-print("\n\n-------- Solving for maximum knights without any attacks --------\n")
-max_knights, solution = find_max_knights(n)
-print(f"Maximum knights placed:", max_knights)
-print("Knight positions:", solution)
+        print("No solution found.")
+elif mode == "max":
+    max_k, solution = find_max_knights(n)
+    print(f"\nMaximum number of non-attacking knights on an {n}x{n} board is: {max_k}, Solution is: ", solution)
+else:
+    print("Invalid mode. Use 'solve' or 'max'.")
